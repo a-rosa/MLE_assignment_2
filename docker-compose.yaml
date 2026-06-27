@@ -1,11 +1,80 @@
+x-airflow-common: &airflow-common
+  build: .
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'mle_assignment_secret'
+    JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+  volumes:
+    - .:/opt/airflow
+  depends_on:
+    postgres:
+      condition: service_healthy
+
 services:
+  postgres:
+    image: postgres:13
+    container_name: mle_postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: mle_airflow_init
+    command: ["bash", "-c", "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@example.com"]
+    restart: on-failure
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: mle_airflow_webserver
+    command: bash -c "rm -f /opt/airflow/airflow-webserver.pid && airflow webserver"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: mle_airflow_scheduler
+    command: airflow scheduler
+    restart: unless-stopped
+
   jupyter:
     build: .
-    container_name: mle_assignment
+    container_name: mle_jupyter
     ports:
       - "8888:8888"
     volumes:
-      - .:/app
+      - .:/opt/airflow
+    working_dir: /opt/airflow
     environment:
       - JUPYTER_ENABLE_LAB=yes
-    command: ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--notebook-dir=/app", "--ServerApp.token=''", "--ServerApp.disable_check_xsrf=True"]
+      - JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    command: >
+      jupyter lab
+        --ip=0.0.0.0
+        --port=8888
+        --no-browser
+        --allow-root
+        --notebook-dir=/opt/airflow
+        --ServerApp.token=''
+        --ServerApp.disable_check_xsrf=True
+
+volumes:
+  postgres-data:
