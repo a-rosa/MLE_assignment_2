@@ -1,2 +1,16 @@
 *.pdf
-sample_assignments/*
+
+datamart/
+data/
+model_bank/
+monitoring/
+logs/
+
+airflow.db
+airflow-webserver.pid
+airflow.cfg
+webserver_config.py
+
+.ipynb_checkpoints/
+_pycache__/, *.pyc
+.Trash-0/
