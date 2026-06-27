@@ -12,7 +12,8 @@ airflow.cfg
 webserver_config.py
 
 .ipynb_checkpoints/
-_pycache__/, *.pyc
+_pycache__/
+*.pyc
 .Trash-0/
 
 readme.txt
